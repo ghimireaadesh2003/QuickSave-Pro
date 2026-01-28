@@ -1,0 +1,307 @@
+import { LinearGradient } from "expo-linear-gradient";
+import { Download } from "lucide-react-native";
+import React, { useCallback, useRef, useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StatusBar,
+  TextInput,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
+
+// Context
+import { useDownloads } from "../../context/DownloadContext";
+
+// Components
+import { FormatPickerDialog } from "../../components/ui/FormatPickerDialog";
+
+// Utils and Types
+import { Toast } from "../../components/ui/Toast";
+import { useToast } from "../../hooks/useToast";
+import { FormatType } from "../../types";
+import {
+  COLORS,
+  GRADIENTS,
+  HOME_URL,
+  PLATFORM_VALUES,
+} from "../../utils/constants";
+
+export default function BrowserScreen() {
+  const webViewRef = useRef<WebView>(null);
+  const { addVideoAndStartDownload } = useDownloads();
+
+  const [url, setUrl] = useState(HOME_URL);
+  const [input, setInput] = useState(HOME_URL);
+  const [videoDetected, setVideoDetected] = useState(false);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
+  const [currentVideoTitle, setCurrentVideoTitle] = useState<string | null>(
+    null,
+  );
+  const { showToast, toastMessage, toastOpacity, displayToast } = useToast();
+  const [pickerVisible, setPickerVisible] = useState(false);
+
+  /* ============================
+     INJECTED JS (FIXED FACEBOOK)
+  ============================ */
+  const injectedJS = `
+  (function () {
+    let lastDetectedUrl = null;
+
+    function getCenterPlayingVideo() {
+      const videos = document.querySelectorAll("video");
+      let best = null;
+      let min = Infinity;
+
+      videos.forEach(v => {
+        if (v.paused || v.readyState < 2) return;
+
+        const r = v.getBoundingClientRect();
+        const dist = Math.abs(
+          (r.top + r.height / 2) - window.innerHeight / 2
+        );
+        if (dist < min) {
+          min = dist;
+          best = v;
+        }
+      });
+
+      return best;
+    }
+
+    function extract() {
+      const video = getCenterPlayingVideo();
+      if (!video) return;
+
+      const host = location.hostname;
+      const title =
+        document.querySelector('meta[property="og:title"]')?.content ||
+        document.title;
+
+      let finalUrl = null;
+
+      /* ================= YOUTUBE ================= */
+      if (host.includes("youtube.com")) {
+        const currentPath = location.pathname;
+        if (currentPath.includes("/shorts/")) {
+          // Detect Shorts
+          const shortId = currentPath.split("/shorts/")[1].split("/")[0].split("?")[0];
+          finalUrl = "https://youtu.be/" + shortId;
+        } else {
+          // Standard Video
+          const canonical = document.querySelector('link[rel="canonical"]')?.href || location.href;
+          try {
+            const v = new URL(canonical).searchParams.get("v");
+            if (v) finalUrl = "https://youtu.be/" + v;
+          } catch(e) {}
+        }
+      }
+
+      /* ================= INSTAGRAM ================= */
+      else if (host.includes("instagram.com")) {
+        const container =
+          video.closest("article") ||
+          video.closest("div[role='presentation']");
+        const link = container?.querySelector(
+          "a[href*='/reel/'], a[href*='/p/']"
+        );
+        if (link) {
+          finalUrl = "https://www.instagram.com" + link.getAttribute("href");
+        }
+      }
+
+      /* ================= TIKTOK ================= */
+      else if (host.includes("tiktok.com")) {
+        const container =
+          video.closest("div[data-e2e='feed-video'], article");
+        const link = container?.querySelector("a[href*='/video/']");
+        if (link) finalUrl = link.href.split("?")[0];
+      }
+
+      /* ================= FACEBOOK (FIXED) ================= */
+      else if (host.includes("facebook.com")) {
+        // Canonical works reliably ONLY when a video is playing
+        const og =
+          document.querySelector('meta[property="og:url"]')?.content ||
+          document.querySelector('link[rel="canonical"]')?.href ||
+          location.href;
+
+        if (
+          og.includes("/watch") ||
+          og.includes("/reel") ||
+          og.includes("/videos")
+        ) {
+          finalUrl = og.split("?")[0];
+        }
+      }
+
+      if (!finalUrl || finalUrl === lastDetectedUrl) return;
+
+      lastDetectedUrl = finalUrl;
+
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          type: "SHARE_METADATA",
+          title,
+          url: finalUrl,
+        })
+      );
+    }
+
+    window.addEventListener(
+      "scroll",
+      () => setTimeout(extract, 300),
+      { passive: true }
+    );
+
+    setInterval(extract, 2000);
+  })();
+  true;
+  `;
+
+  const onMessage = useCallback((event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === "SHARE_METADATA") {
+        console.log("✅ Video Detected:", data.url);
+        setCurrentVideoUrl(data.url);
+        setCurrentVideoTitle(data.title);
+        setVideoDetected(true);
+      }
+    } catch {}
+  }, []);
+
+  const submitUrl = () => {
+    let finalUrl = input.trim();
+    if (!finalUrl.startsWith("http")) {
+      finalUrl = `https://www.google.com/search?q=${encodeURIComponent(finalUrl)}`;
+    }
+    setVideoDetected(false);
+    setCurrentVideoUrl(null);
+    setCurrentVideoTitle(null);
+    setUrl(finalUrl);
+  };
+
+  const startDownload = async (format: FormatType) => {
+    if (!currentVideoUrl) return;
+    try {
+      displayToast(
+        `⏳ Saving Started: ${currentVideoTitle ? `\n${currentVideoTitle}` : ""}`,
+      );
+      // Alert.alert("Saving Started", currentVideoTitle || "");
+      await addVideoAndStartDownload(currentVideoUrl, format);
+      // Alert.alert("Saving Completed", currentVideoTitle || "");
+      displayToast(
+        `✅ Saving Completed: ${currentVideoTitle ? `\n${currentVideoTitle}` : ""}`,
+      );
+    } catch {
+      Alert.alert("Saving Failed");
+    }
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      {/* Toast Notification */}
+      <Toast
+        visible={showToast}
+        message={toastMessage}
+        opacity={toastOpacity}
+      />
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: COLORS.background,
+          marginBottom:
+            Platform.OS === "ios"
+              ? PLATFORM_VALUES.browserBottomIOS
+              : PLATFORM_VALUES.browserBottomAndroid,
+        }}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              padding: 8,
+              backgroundColor: "#111827",
+            }}
+          >
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              onSubmitEditing={submitUrl}
+              placeholder="Search or enter website"
+              placeholderTextColor={COLORS.textMuted}
+              style={{
+                flex: 1,
+                color: COLORS.textPrimary,
+                backgroundColor: "#1F2937",
+                paddingHorizontal: 12,
+                borderRadius: 10,
+                height: 40,
+              }}
+            />
+          </View>
+
+          <WebView
+            ref={webViewRef}
+            source={{ uri: url }}
+            injectedJavaScript={injectedJS}
+            onMessage={onMessage}
+            javaScriptEnabled
+            domStorageEnabled
+            allowsInlineMediaPlayback
+          />
+
+          {videoDetected && (
+            <View
+              style={{
+                position: "absolute",
+                bottom:
+                  Platform.OS === "ios"
+                    ? PLATFORM_VALUES.browserFabBottomIOS
+                    : PLATFORM_VALUES.browserFabBottomAndroid,
+                right: 24,
+              }}
+            >
+              <Pressable onPress={() => setPickerVisible(true)}>
+                <LinearGradient
+                  colors={GRADIENTS.blue}
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Download size={26} color={COLORS.textPrimary} />
+                </LinearGradient>
+              </Pressable>
+            </View>
+          )}
+          <FormatPickerDialog
+            visible={pickerVisible}
+            title="Save video?"
+            subtitle={currentVideoTitle || ""}
+            onCancel={() => setPickerVisible(false)}
+            onSelectMP3={() => {
+              setPickerVisible(false);
+              startDownload("mp3");
+            }}
+            onSelectMP4={() => {
+              setPickerVisible(false);
+              startDownload("mp4");
+            }}
+          />
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
+  );
+}

@@ -1,0 +1,335 @@
+# Context-Based Architecture (Recommended)
+New Files (7 total)
+
+context/types.ts - All type definitions cleanly separated
+services/storageService.ts - AsyncStorage operations (load/save videos & preferences)
+services/downloadService.ts - File download logic with progress tracking
+services/audioService.ts - Audio mode configuration (setup/playback/reset)
+hooks/useDownloadManager.ts - Business logic (add, delete, retry downloads)
+context/DownloadContext.tsx (refactored) - Clean 65-line orchestrator
+utils/constants.ts (updated) - Added backend URL configuration
+
+## 📁 Final File Structure
+
+```
+src/
+├── components/
+│   ├── common/                        (3 files)
+│   │   ├── CircularProgress.tsx
+│   │   ├── EmptyState.tsx
+│   │   └── Toast.tsx
+│   │
+│   ├── home/                          (7 files)
+│   │   ├── HomeHeader.tsx
+│   │   ├── AdSection.tsx
+│   │   ├── VideoInputCard.tsx
+│   │   ├── FormatSelector.tsx
+│   │   ├── FeaturesGrid.tsx
+│   │   ├── QuickStats.tsx
+│   │   └── SettingsModal.tsx
+│   │
+│   └── downloads/                     (10 files)
+│       ├── DownloadScreenHeader.tsx
+│       ├── DownloadHeader.tsx
+│       ├── SearchBar.tsx
+│       ├── FilterPills.tsx
+│       ├── VideoList.tsx
+│       ├── VideoCard.tsx
+│       ├── VideoCardPreview.tsx
+│       ├── VideoCardInfo.tsx
+│       ├── VideoCardActions.tsx
+│       ├── VideoThumbnail.tsx
+│       └── VideoPlayerModal.tsx
+│
+├── screens/                           (2 files)
+│   ├── HomeScreen.tsx
+│   └── DownloadsScreen.tsx
+│
+├── context/                           (6 files) ⭐ NEW
+│   ├── VideoStateContext.tsx         ✅ Video state + persistence
+│   ├── SettingsContext.tsx           ✅ App settings
+│   ├── DownloadManagerContext.tsx    ✅ Download operations
+│   ├── ToastContext.tsx              ✅ Toast notifications
+│   ├── AppProviders.tsx              ✅ Combines all providers
+│   ├── useDownloads.ts               ✅ Combined hook (backward compatible)
+│   └── index.ts                      ✅ Exports all hooks
+│
+├── utils/                             (3 files)
+│   ├── haptics.ts
+│   ├── formatters.ts
+│   └── download.ts
+│
+├── types/                             (1 file)
+│   └── video.ts
+│
+└── constants/                         (1 file)
+    └── config.ts
+```
+
+## 🎯 Context Architecture
+New Files (7 total)
+
+context/types.ts - All type definitions cleanly separated
+services/storageService.ts - AsyncStorage operations (load/save videos & preferences)
+services/downloadService.ts - File download logic with progress tracking
+services/audioService.ts - Audio mode configuration (setup/playback/reset)
+hooks/useDownloadManager.ts - Business logic (add, delete, retry downloads)
+context/DownloadContext.tsx (refactored) - Clean 65-line orchestrator
+utils/constants.ts (updated) - Added backend URL configuration
+
+### 1. VideoStateContext
+**Purpose:** Manages video list and persistence
+```typescript
+const { videos, updateVideo, addVideo, removeVideo } = useVideoState();
+```
+
+### 2. SettingsContext
+**Purpose:** Manages app settings
+```typescript
+const { saveToDevice, setSaveToDevice } = useSettings();
+```
+
+### 3. DownloadManagerContext
+**Purpose:** Handles download operations
+```typescript
+const { downloadFile, retryDownload } = useDownloadManager();
+```
+
+### 4. ToastContext
+**Purpose:** Global toast notifications
+```typescript
+const { showToast } = useToast();
+showToast("✅ Download started!");
+```
+
+### 5. AppProviders
+**Purpose:** Wraps all context providers
+```typescript
+<AppProviders>
+  <YourApp />
+</AppProviders>
+```
+
+## 🚀 Setup Instructions
+
+### Step 1: Wrap Your App
+```typescript
+// _layout.tsx or App.tsx
+import { AppProviders } from './src/context';
+
+export default function RootLayout() {
+  return (
+    <AppProviders>
+      <YourAppContent />
+    </AppProviders>
+  );
+}
+```
+
+### Step 2: Use in Components
+```typescript
+// Any component
+import { useDownloads, useToast } from '../context';
+
+function AnyComponent() {
+  const { videos, addVideoAndStartDownload } = useDownloads();
+  const { showToast } = useToast();
+  
+  const handleDownload = async () => {
+    await addVideoAndStartDownload(url, "mp4");
+    showToast("Download started!");
+  };
+}
+```
+
+## ✨ Benefits of Context Architecture
+
+### 1. **Global Access**
+```typescript
+// Use anywhere in the app - no prop drilling
+const { showToast } = useToast();
+const { videos } = useVideoState();
+const { downloadFile } = useDownloadManager();
+```
+
+### 2. **Separation of Concerns**
+- `VideoStateContext` → State management
+- `DownloadManagerContext` → Business logic
+- `SettingsContext` → Configuration
+- `ToastContext` → UI feedback
+
+### 3. **Easy Testing**
+```typescript
+// Mock contexts in tests
+<VideoStateContext.Provider value={mockValue}>
+  <ComponentToTest />
+</VideoStateContext.Provider>
+```
+
+### 4. **Backward Compatible**
+```typescript
+// Old code still works with useDownloads hook
+const { videos, addVideoAndStartDownload } = useDownloads();
+```
+
+### 5. **Scalable**
+Easy to add new contexts:
+```typescript
+// Add new context
+export function NotificationContext() { ... }
+
+// Add to AppProviders
+<AppProviders>
+  <NotificationProvider>
+    <App />
+  </NotificationProvider>
+</AppProviders>
+```
+
+## 📝 Usage Examples
+
+### Example 1: Home Screen
+```typescript
+import { useDownloads, useToast } from '../context';
+
+function HomeScreen() {
+  const { addVideoAndStartDownload } = useDownloads();
+  const { showToast } = useToast();
+  
+  const handleSubmit = async () => {
+    await addVideoAndStartDownload(url, format);
+    showToast("✅ Download started!");
+  };
+}
+```
+
+### Example 2: Settings Modal
+```typescript
+import { useSettings } from '../context';
+
+function SettingsModal() {
+  const { saveToDevice, setSaveToDevice } = useSettings();
+  
+  return (
+    <Switch value={saveToDevice} onChange={setSaveToDevice} />
+  );
+}
+```
+
+### Example 3: Video Card
+```typescript
+import { useDownloadManager, useToast } from '../context';
+
+function VideoCard({ video }) {
+  const { retryDownload } = useDownloadManager();
+  const { showToast } = useToast();
+  
+  const handleRetry = async () => {
+    await retryDownload(video.id);
+    showToast("Retrying download...");
+  };
+}
+```
+
+## 🔄 Migration from Hooks to Contexts
+
+### Before (Custom Hooks)
+```typescript
+// Had to import multiple hooks
+import { useVideoState } from '../hooks/useVideoState';
+import { useDownloadManager } from '../hooks/useDownloadManager';
+
+// Logic not accessible globally
+```
+
+### After (Contexts)
+```typescript
+// Single import
+import { useDownloads, useToast } from '../context';
+
+// Accessible anywhere in the app
+```
+
+## ⚡ Performance
+
+Contexts are optimized with:
+- Separate contexts = less re-renders
+- Only components using a context re-render when it changes
+- Videos context doesn't affect Settings context
+
+## 🎓 Best Practices
+
+### 1. Use Specific Contexts
+```typescript
+// ✅ Good - Only subscribes to what you need
+const { videos } = useVideoState();
+
+// ❌ Avoid - Gets everything
+const everything = useDownloads();
+```
+
+### 2. Combine When Needed
+```typescript
+// ✅ Good - Use combined hook when you need multiple
+const { videos, addVideoAndStartDownload, saveToDevice } = useDownloads();
+```
+
+### 3. Keep Contexts Focused
+Each context has ONE responsibility:
+- VideoState → State
+- DownloadManager → Operations
+- Settings → Config
+- Toast → Notifications
+
+## 🛠️ Adding New Features
+
+### Add New Setting
+```typescript
+// 1. Update SettingsContext
+const [newSetting, setNewSetting] = useState(false);
+
+// 2. Use anywhere
+const { newSetting } = useSettings();
+```
+
+### Add New Download Feature
+```typescript
+// 1. Add to DownloadManagerContext
+const pauseDownload = (id: string) => { ... };
+
+// 2. Use anywhere
+const { pauseDownload } = useDownloadManager();
+```
+
+## 📊 Context Hierarchy
+
+```
+AppProviders
+├── ToastProvider          (No dependencies)
+│   └── SettingsProvider   (No dependencies)
+│       └── VideoStateProvider (No dependencies)
+│           └── DownloadManagerProvider (Uses VideoState + Settings)
+│               └── Your App
+```
+
+## ✅ Summary
+
+**Context-based architecture is better because:**
+
+1. ✅ Global access from any component
+2. ✅ No prop drilling
+3. ✅ Clean separation of concerns
+4. ✅ Easy to test and mock
+5. ✅ Scalable for future features
+6. ✅ Better performance (granular updates)
+7. ✅ Follows React best practices
+
+**Total Files: 32**
+- 6 Context files
+- 20 Components
+- 2 Screens
+- 3 Utils
+- 1 Types
+- 1 Constants
+
+
