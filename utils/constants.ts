@@ -1,9 +1,10 @@
 import { Dimensions } from "react-native";
 
 // API URLs
-// export const BACKEND_URL = "https://manometric-nancie-talismanically.ngrok-free.dev";
+export const BACKEND_URL =
+  "https://manometric-nancie-talismanically.ngrok-free.dev";
 // export const BACKEND_URL = "http://192.168.1.8:4000";
-export const BACKEND_URL = "http://192.168.18.4:5000";
+// export const BACKEND_URL = "http://192.168.18.4:5000";
 export const HOME_URL = "https://www.google.com";
 
 // Colors

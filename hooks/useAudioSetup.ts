@@ -9,7 +9,7 @@ export const setupAudioMode = async (): Promise<void> => {
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
+      staysActiveInBackground: true,
       shouldDuckAndroid: true,
       playThroughEarpieceAndroid: false,
     });

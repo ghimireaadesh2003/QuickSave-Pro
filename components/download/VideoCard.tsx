@@ -1,5 +1,4 @@
 import { LinearGradient } from "expo-linear-gradient";
-import * as Sharing from "expo-sharing";
 import {
     CheckCircle,
     Music,
@@ -10,8 +9,8 @@ import {
     X,
 } from "lucide-react-native";
 import React, { memo, useRef } from "react";
-import { Alert, Animated, Platform, Pressable, Text, View } from "react-native";
-import { useDownloads } from "../../context/DownloadContext";
+import { Animated, Platform, Pressable, Text, View } from "react-native";
+import { useMediaActions } from "../../hooks/useMediaActions";
 import { VideoItem } from "../../types";
 import { COLORS, GRADIENTS, ITEM_WIDTH } from "../../utils/constants";
 import {
@@ -19,7 +18,7 @@ import {
     formatFileSize,
     getDisplayName,
 } from "../../utils/formatters";
-import { triggerHaptic, triggerSuccessHaptic } from "../../utils/haptics";
+import { triggerHaptic } from "../../utils/haptics";
 import { CircularProgress } from "./CircularProgress";
 import { VideoThumbnail } from "./VideoThumbnail";
 
@@ -32,67 +31,13 @@ type VideoCardProps = {
  * Video card component displaying video info and actions
  */
 export const VideoCard = memo<VideoCardProps>(({ item, onOpenPlayer }) => {
-  const { deleteVideo, saveVideoToDevice } = useDownloads();
+  const { handleShare, handleDelete, handleSave } = useMediaActions();
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePlay = () => {
     if (item.status === "completed" && item.localUri) {
       triggerHaptic("light");
       onOpenPlayer(item.localUri);
-    }
-  };
-
-  const handleDelete = () => {
-    triggerHaptic("medium");
-    Alert.alert("Delete Video", "Are you sure?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          triggerSuccessHaptic();
-          deleteVideo(item.id);
-        },
-      },
-    ]);
-  };
-
-  const handleSave = () => {
-    if (!canSave) return;
-    triggerHaptic("medium");
-    saveVideoToDevice(item.id);
-  };
-
-  const handleShare = async () => {
-    if (!item.localUri) return;
-
-    triggerHaptic("medium");
-
-    try {
-      const isAvailable = await Sharing.isAvailableAsync();
-
-      if (!isAvailable) {
-        Alert.alert(
-          "Sharing Not Available",
-          "Sharing is not available on this device.",
-        );
-        return;
-      }
-
-      await Sharing.shareAsync(item.localUri, {
-        mimeType: item.format === "mp4" ? "video/mp4" : "audio/mpeg",
-        dialogTitle: `Share ${item.format === "mp4" ? "Video" : "Audio"}`,
-        UTI: item.format === "mp4" ? "public.movie" : "public.audio",
-      });
-
-      triggerSuccessHaptic();
-      console.log("File shared successfully");
-    } catch (error) {
-      console.error("Error sharing:", error);
-      Alert.alert(
-        "Share Failed",
-        "Could not share this file. Please make sure the file exists and try again.",
-      );
     }
   };
 
@@ -404,7 +349,7 @@ export const VideoCard = memo<VideoCardProps>(({ item, onOpenPlayer }) => {
               <Pressable
                 onPress={() => {
                   animatePress();
-                  handleSave();
+                  handleSave(item);
                 }}
                 style={{
                   flex: 1,
@@ -440,7 +385,7 @@ export const VideoCard = memo<VideoCardProps>(({ item, onOpenPlayer }) => {
               <Pressable
                 onPress={() => {
                   animatePress();
-                  handleShare();
+                  handleShare(item);
                 }}
                 style={{
                   backgroundColor: "rgba(59, 130, 246, 0.2)",
@@ -459,7 +404,7 @@ export const VideoCard = memo<VideoCardProps>(({ item, onOpenPlayer }) => {
             <Pressable
               onPress={() => {
                 animatePress();
-                handleDelete();
+                handleDelete(item);
               }}
               style={{
                 backgroundColor: "rgba(239, 68, 68, 0.2)",

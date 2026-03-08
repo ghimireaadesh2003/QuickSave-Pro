@@ -10,7 +10,6 @@ export type VideoItem = {
   format: "mp4" | "mp3";
   size?: number;
   duration?: number;
-  resumePosition?: number;
 };
 
 export type FormatType = "mp4" | "mp3";

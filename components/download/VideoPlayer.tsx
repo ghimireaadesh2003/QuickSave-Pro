@@ -50,18 +50,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       videoPlayer.replace(videoUri);
       videoPlayer.play();
     }
+    
+    return () => {
+      // expo-video handles internal cleanup; manual pause on unmount can cause 'already released' errors
+    };
   }, [videoUri, videoPlayer]);
 
   const handleClose = async () => {
-    if (videoPlayer) {
-      videoPlayer.pause();
+    try {
+      if (videoPlayer) {
+        videoPlayer.pause();
+      }
+    } catch (e) {
+      console.warn("VideoPlayer pause error:", e);
     }
 
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
         shouldDuckAndroid: true,
         playThroughEarpieceAndroid: false,
       });
